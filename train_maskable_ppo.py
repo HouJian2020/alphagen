@@ -5,6 +5,7 @@ from datetime import datetime
 import fire
 
 import numpy as np
+import torch
 from sb3_contrib.ppo_mask import MaskablePPO
 from stable_baselines3.common.callbacks import BaseCallback
 from alphagen.data.calculator import AlphaCalculator
@@ -91,28 +92,29 @@ class CustomCallback(BaseCallback):
 
 def main(
     seed: int = 0,
-    instruments: str = "csi300",
-    pool_capacity: int = 10,
-    steps: int = 200_000
+    instruments: str = "csi500",
+    pool_capacity: int = 22,
+    steps: int = 300_000
 ):
     reseed_everything(seed)
 
     device = torch.device('cuda:0')
-    close = Feature(FeatureType.CLOSE)
-    target = Ref(close, -20) / close - 1
+    # close = Feature(FeatureType.CLOSE)
+    vwap = Feature(FeatureType.VWAP)
+    target = Ref(vwap, -10) / vwap - 1
 
     # You can re-implement AlphaCalculator instead of using QLibStockDataCalculator.
     data_train = StockData(instrument=instruments,
-                           start_time='2010-01-01',
-                           end_time='2019-12-31')
-    data_valid = StockData(instrument=instruments,
-                           start_time='2020-01-01',
-                           end_time='2020-12-31')
+                           start_time='2013-01-01',
+                           end_time='2018-11-30')
+    # data_valid = StockData(instrument=instruments,
+    #                        start_time='2017-01-01',
+    #                        end_time='2018-11-30')
     data_test = StockData(instrument=instruments,
-                          start_time='2021-01-01',
-                          end_time='2022-12-31')
+                          start_time='2019-01-01',
+                          end_time='2021-12-31')
     calculator_train = QLibStockDataCalculator(data_train, target)
-    calculator_valid = QLibStockDataCalculator(data_valid, target)
+    # calculator_valid = QLibStockDataCalculator(data_valid, target)
     calculator_test = QLibStockDataCalculator(data_test, target)
 
     pool = AlphaPool(
@@ -129,8 +131,8 @@ def main(
     checkpoint_callback = CustomCallback(
         save_freq=10000,
         show_freq=10000,
-        save_path='/path/for/checkpoints',
-        valid_calculator=calculator_valid,
+        save_path=os.path.expanduser('~/.project_results/alphagen/checkpoints'),
+        valid_calculator=None,
         test_calculator=calculator_test,
         name_prefix=name_prefix,
         timestamp=timestamp,
@@ -152,7 +154,7 @@ def main(
         gamma=1.,
         ent_coef=0.01,
         batch_size=128,
-        tensorboard_log='/path/for/tb/log',
+        tensorboard_log=os.path.expanduser('~/.project_results/alphagen/tb_log'),
         device=device,
         verbose=1,
     )
@@ -186,4 +188,6 @@ def fire_helper(
 
 
 if __name__ == '__main__':
-    fire.Fire(fire_helper)
+    # fire.Fire(fire_helper)
+    main()
+    torch.eq
