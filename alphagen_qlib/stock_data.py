@@ -12,6 +12,8 @@ class FeatureType(IntEnum):
     LOW = 3
     VOLUME = 4
     VWAP = 5
+    TRADEABLE = 6
+    ISMEM = 7
 
 IND_MAP = {'csi300': '000300',
            'csi500': '000905',
