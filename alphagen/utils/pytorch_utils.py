@@ -21,13 +21,13 @@ def masked_mean_std(
     x = x.clone()
     x[mask] = 0.
     mean = x.sum(dim=1) / n
-    std = ((((x - mean[:, None]) * ~mask) ** 2).sum(dim=1) / n).sqrt()
+    std = ((((x - mean[:, None]) * ~mask) ** 2).sum(dim=1) / (n - 1)).sqrt()
     return mean, std
 
 
 def normalize_by_day(value: Tensor) -> Tensor:
     mean, std = masked_mean_std(value)
     value = (value - mean[:, None]) / std[:, None]
-    nan_mask = torch.isnan(value)
-    value[nan_mask] = 0.
+    # nan_mask = torch.isnan(value)
+    # value[nan_mask] = torch.nan
     return value

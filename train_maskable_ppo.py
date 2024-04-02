@@ -101,7 +101,8 @@ def main(
     device = torch.device('cuda:0')
     # close = Feature(FeatureType.CLOSE)
     vwap = Feature(FeatureType.VWAP)
-    target = ISCONST_AND_TRADEABLE(Ref(vwap, -11) / Ref(vwap, -1) - 1, -1)  # TODO 当天属于成分股，第二天可以可以交易， 否则为nan
+    target = Ref(vwap, -11) / Ref(vwap, -1) - 1
+    mask = ISCONST_AND_TRADEABLE(vwap, -1)
 
     # You can re-implement AlphaCalculator instead of using QLibStockDataCalculator.
     data_train = StockData(instrument=instruments,
@@ -113,9 +114,9 @@ def main(
     data_test = StockData(instrument=instruments,
                           start_time='2019-01-01',
                           end_time='2021-12-31')
-    calculator_train = QLibStockDataCalculator(data_train, target)
+    calculator_train = QLibStockDataCalculator(data_train, target, mask)
     # calculator_valid = QLibStockDataCalculator(data_valid, target)
-    calculator_test = QLibStockDataCalculator(data_test, target)
+    calculator_test = QLibStockDataCalculator(data_test, target, mask)
 
     pool = AlphaPool(
         capacity=pool_capacity,

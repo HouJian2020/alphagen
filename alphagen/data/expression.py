@@ -345,15 +345,22 @@ class Ref(RollingOperator):
         # This is just for fulfilling the RollingOperator interface
         ...
 
+
 class ISCONST_AND_TRADEABLE(RollingOperator):
     def evaluate(self, data: StockData, period: slice = slice(0, 1)) -> Tensor:
+        start = period.start + data.max_backtrack_days
+        stop = period.stop + data.max_backtrack_days + data.n_days - 1
+        is_constituent = data.data[start:stop, int(FeatureType.ISCONSTITUENT), :]
         start = period.start - self._delta_time
         stop = period.stop - self._delta_time
-        return self._operand.evaluate(data, slice(start, stop))
+        trade_able = data.data[start:stop, int(FeatureType.TRADEABLE), :]
+        # return ~(is_constituent.bool() & trade_able.bool())
+        return ~is_constituent.bool()
 
     def _apply(self, operand: Tensor) -> Tensor:
         # This is just for fulfilling the RollingOperator interface
         ...
+
 
 class Mean(RollingOperator):
     def _apply(self, operand: Tensor) -> Tensor:

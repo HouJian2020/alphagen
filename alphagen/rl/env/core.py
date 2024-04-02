@@ -28,6 +28,7 @@ class AlphaEnvCore(gym.Env):
         self._device = device
 
         self.eval_cnt = 0
+        self.alpha_set = {}
 
         self.render_mode = None
 
@@ -64,10 +65,13 @@ class AlphaEnvCore(gym.Env):
 
     def _evaluate(self):
         expr: Expression = self._builder.get_tree()
+        # if str(expr) in self.alpha_set:
+        #     return self.alpha_set[str(expr)]
         if self._print_expr:
-            print(expr)
+            print(expr, len(self.alpha_set))
         try:
             ret = self.pool.try_new_expr(expr)
+            self.alpha_set[str(expr)] = ret
             self.eval_cnt += 1
             return ret
         except OutOfDataRangeError:

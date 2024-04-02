@@ -19,18 +19,16 @@ class QLibStockDataCalculator(AlphaCalculator):
             self.target_value[self.mask] = torch.nan
             self.target_value = normalize_by_day(self.target_value)
 
-
-
     def _calc_alpha(self, expr: Expression) -> Tensor:
         alpha = expr.evaluate(self.data)
         alpha[self.mask] = torch.nan
         return normalize_by_day(alpha)
 
     def _calc_IC(self, value1: Tensor, value2: Tensor) -> float:
-        return batch_pearsonr(value1, value2).mean().item()
+        return torch.nanmean(batch_pearsonr(value1, value2)).item()
 
     def _calc_rIC(self, value1: Tensor, value2: Tensor) -> float:
-        return batch_spearmanr(value1, value2).mean().item()
+        return torch.nanmean(batch_spearmanr(value1, value2)).item()
 
     def make_ensemble_alpha(self, exprs: List[Expression], weights: List[float]) -> Tensor:
         n = len(exprs)

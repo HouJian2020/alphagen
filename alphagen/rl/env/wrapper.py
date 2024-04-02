@@ -9,7 +9,7 @@ from alphagen.rl.env.core import AlphaEnvCore
 
 SIZE_NULL = 1
 SIZE_OP = len(OPERATORS)
-SIZE_FEATURE = len(FeatureType)
+SIZE_FEATURE = len(FeatureType) - 2  # 扣除两个布尔型的标记
 SIZE_DELTA_TIME = len(DELTA_TIMES)
 SIZE_CONSTANT = len(CONSTANTS)
 SIZE_SEP = 1
@@ -52,7 +52,7 @@ class AlphaEnvWrapper(gym.Wrapper):
     def __init__(self, env: AlphaEnvCore):
         super().__init__(env)
         self.action_space = gym.spaces.Discrete(SIZE_ACTION)
-        self.observation_space = gym.spaces.Box(low=0, high=SIZE_ALL - 1, shape=(MAX_EXPR_LENGTH, ), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(low=0, high=SIZE_ALL - 1, shape=(MAX_EXPR_LENGTH,), dtype=np.uint8)
 
     def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
         self.counter = 0
