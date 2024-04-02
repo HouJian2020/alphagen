@@ -101,7 +101,7 @@ def main(
     device = torch.device('cuda:0')
     # close = Feature(FeatureType.CLOSE)
     vwap = Feature(FeatureType.VWAP)
-    target = Ref(vwap, -11) / Ref(vwap, -1) - 1  # TODO 剔除涨停与跌停的影响
+    target = ISCONST_AND_TRADEABLE(Ref(vwap, -11) / Ref(vwap, -1) - 1, -1)  # TODO 当天属于成分股，第二天可以可以交易， 否则为nan
 
     # You can re-implement AlphaCalculator instead of using QLibStockDataCalculator.
     data_train = StockData(instrument=instruments,

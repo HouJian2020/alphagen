@@ -9,16 +9,22 @@ from alphagen_qlib.stock_data import StockData
 
 
 class QLibStockDataCalculator(AlphaCalculator):
-    def __init__(self, data: StockData, target: Optional[Expression]):
+    def __init__(self, data: StockData, target: Optional[Expression], mask: Optional[Expression]):
         self.data = data
-
+        self.mask = mask.evaluate(self.data)
         if target is None: # Combination-only mode
             self.target_value = None
         else:
-            self.target_value = normalize_by_day(target.evaluate(self.data))
+            self.target_value = target.evaluate(self.data)
+            self.target_value[self.mask] = torch.nan
+            self.target_value = normalize_by_day(self.target_value)
+
+
 
     def _calc_alpha(self, expr: Expression) -> Tensor:
-        return normalize_by_day(expr.evaluate(self.data))
+        alpha = expr.evaluate(self.data)
+        alpha[self.mask] = torch.nan
+        return normalize_by_day(alpha)
 
     def _calc_IC(self, value1: Tensor, value2: Tensor) -> float:
         return batch_pearsonr(value1, value2).mean().item()

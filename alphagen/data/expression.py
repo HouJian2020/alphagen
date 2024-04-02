@@ -6,6 +6,8 @@ from torch import Tensor
 
 from alphagen_qlib.stock_data import StockData, FeatureType
 
+_EPS = 1e-6
+
 
 class OutOfDataRangeError(IndexError):
     pass
@@ -13,9 +15,11 @@ class OutOfDataRangeError(IndexError):
 
 class Expression(metaclass=ABCMeta):
     @abstractmethod
-    def evaluate(self, data: StockData, period: slice = slice(0, 1)) -> Tensor: ...
+    def evaluate(self, data: StockData, period: slice = slice(0, 1)) -> Tensor:
+        ...
 
-    def __repr__(self) -> str: return str(self)
+    def __repr__(self) -> str:
+        return str(self)
 
     def __add__(self, other: Union["Expression", float]) -> "Add":
         if isinstance(other, Expression):
@@ -23,7 +27,8 @@ class Expression(metaclass=ABCMeta):
         else:
             return Add(self, Constant(other))
 
-    def __radd__(self, other: float) -> "Add": return Add(Constant(other), self)
+    def __radd__(self, other: float) -> "Add":
+        return Add(Constant(other), self)
 
     def __sub__(self, other: Union["Expression", float]) -> "Sub":
         if isinstance(other, Expression):
@@ -31,7 +36,8 @@ class Expression(metaclass=ABCMeta):
         else:
             return Sub(self, Constant(other))
 
-    def __rsub__(self, other: float) -> "Sub": return Sub(Constant(other), self)
+    def __rsub__(self, other: float) -> "Sub":
+        return Sub(Constant(other), self)
 
     def __mul__(self, other: Union["Expression", float]) -> "Mul":
         if isinstance(other, Expression):
@@ -39,7 +45,8 @@ class Expression(metaclass=ABCMeta):
         else:
             return Mul(self, Constant(other))
 
-    def __rmul__(self, other: float) -> "Mul": return Mul(Constant(other), self)
+    def __rmul__(self, other: float) -> "Mul":
+        return Mul(Constant(other), self)
 
     def __truediv__(self, other: Union["Expression", float]) -> "Div":
         if isinstance(other, Expression):
@@ -47,7 +54,8 @@ class Expression(metaclass=ABCMeta):
         else:
             return Div(self, Constant(other))
 
-    def __rtruediv__(self, other: float) -> "Div": return Div(Constant(other), self)
+    def __rtruediv__(self, other: float) -> "Div":
+        return Div(Constant(other), self)
 
     def __pow__(self, other: Union["Expression", float]) -> "Pow":
         if isinstance(other, Expression):
@@ -55,14 +63,21 @@ class Expression(metaclass=ABCMeta):
         else:
             return Pow(self, Constant(other))
 
-    def __rpow__(self, other: float) -> "Pow": return Pow(Constant(other), self)
+    def __rpow__(self, other: float) -> "Pow":
+        return Pow(Constant(other), self)
 
-    def __pos__(self) -> "Expression": return self
-    def __neg__(self) -> "Sub": return Sub(Constant(0), self)
-    def __abs__(self) -> "Abs": return Abs(self)
+    def __pos__(self) -> "Expression":
+        return self
+
+    def __neg__(self) -> "Sub":
+        return Sub(Constant(0), self)
+
+    def __abs__(self) -> "Abs":
+        return Abs(self)
 
     @property
-    def is_featured(self): raise NotImplementedError
+    def is_featured(self):
+        raise NotImplementedError
 
 
 class Feature(Expression):
@@ -198,9 +213,9 @@ class RollingOperator(Operator):
         # L: period length (requested time window length)
         # W: window length (dt for rolling)
         # S: stock count
-        values = self._operand.evaluate(data, slice(start, stop))   # (L+W-1, S)
-        values = values.unfold(0, self._delta_time, 1)              # (L, S, W)
-        return self._apply(values)                                  # (L, S)
+        values = self._operand.evaluate(data, slice(start, stop))  # (L+W-1, S)
+        values = values.unfold(0, self._delta_time, 1)  # (L, S, W)
+        return self._apply(values)  # (L, S)
 
     @abstractmethod
     def _apply(self, operand: Tensor) -> Tensor: ...
@@ -235,13 +250,13 @@ class PairRollingOperator(Operator):
         # L: period length (requested time window length)
         # W: window length (dt for rolling)
         # S: stock count
-        values = expr.evaluate(data, slice(start, stop))            # (L+W-1, S)
-        return values.unfold(0, self._delta_time, 1)                # (L, S, W)
+        values = expr.evaluate(data, slice(start, stop))  # (L+W-1, S)
+        return values.unfold(0, self._delta_time, 1)  # (L, S, W)
 
     def evaluate(self, data: StockData, period: slice = slice(0, 1)) -> Tensor:
         lhs = self._unfold_one(self._lhs, data, period)
         rhs = self._unfold_one(self._rhs, data, period)
-        return self._apply(lhs, rhs)                                # (L, S)
+        return self._apply(lhs, rhs)  # (L, S)
 
     @abstractmethod
     def _apply(self, lhs: Tensor, rhs: Tensor) -> Tensor: ...
@@ -264,7 +279,7 @@ class Sign(UnaryOperator):
 
 
 class Log(UnaryOperator):
-    def _apply(self, operand: Tensor) -> Tensor: return operand.log()
+    def _apply(self, operand: Tensor) -> Tensor: return torch.log(torch.abs(operand) + _EPS)
 
 
 class CSRank(UnaryOperator):
@@ -289,7 +304,10 @@ class Mul(BinaryOperator):
 
 
 class Div(BinaryOperator):
-    def _apply(self, lhs: Tensor, rhs: Tensor) -> Tensor: return lhs / rhs
+    def _apply(self, lhs: Tensor, rhs: Tensor) -> Tensor:
+        res = lhs / rhs
+        res[torch.abs(rhs) <= _EPS] = torch.nan  # 分母小于某个值则设为Nan
+        return res
 
 
 class Pow(BinaryOperator):
@@ -327,13 +345,24 @@ class Ref(RollingOperator):
         # This is just for fulfilling the RollingOperator interface
         ...
 
+class ISCONST_AND_TRADEABLE(RollingOperator):
+    def evaluate(self, data: StockData, period: slice = slice(0, 1)) -> Tensor:
+        start = period.start - self._delta_time
+        stop = period.stop - self._delta_time
+        return self._operand.evaluate(data, slice(start, stop))
+
+    def _apply(self, operand: Tensor) -> Tensor:
+        # This is just for fulfilling the RollingOperator interface
+        ...
 
 class Mean(RollingOperator):
-    def _apply(self, operand: Tensor) -> Tensor: return operand.mean(dim=-1)
+    def _apply(self, operand: Tensor) -> Tensor:
+        return torch.nanmean(operand, dim=-1)
 
 
 class Sum(RollingOperator):
-    def _apply(self, operand: Tensor) -> Tensor: return operand.sum(dim=-1)
+    def _apply(self, operand: Tensor) -> Tensor:
+        return torch.nansum(operand, dim=-1)
 
 
 class Std(RollingOperator):

@@ -5,6 +5,8 @@ import pandas as pd
 import torch
 
 from findata import get_data
+
+
 class FeatureType(IntEnum):
     OPEN = 0
     CLOSE = 1
@@ -13,16 +15,16 @@ class FeatureType(IntEnum):
     VOLUME = 4
     VWAP = 5
     TRADEABLE = 6
-    ISMEM = 7
+    ISCONSTITUENT = 7
+
 
 IND_MAP = {'csi300': '000300',
            'csi500': '000905',
            'csi800': '000906',
-           'csi1000': '000852',}
+           'csi1000': '000852', }
 
 
 class StockData:
-
 
     def __init__(self,
                  instrument: str,
@@ -33,7 +35,6 @@ class StockData:
                  features: Optional[List[FeatureType]] = None,
                  device: torch.device = torch.device('cuda:0')) -> None:
 
-
         self._instrument = instrument
         self.max_backtrack_days = max_backtrack_days
         self.max_future_days = max_future_days
@@ -42,7 +43,6 @@ class StockData:
         self._features = features if features is not None else list(FeatureType)
         self.device = device
         self.data, self._dates, self._stock_ids = self._get_data()
-
 
     def _load_exprs(self, exprs: Union[str, List[str]]) -> pd.DataFrame:
         trade_date: pd.Series = get_data.ATradeDate()
@@ -74,9 +74,11 @@ class StockData:
             if col == '$vwap':
                 vwap = df_temp['amount'] * df_temp['adjFactor'] / df_temp['volume']
                 df_feature[col] = np.where(df_temp['volume'] >= 300, vwap, df_temp['closeAdj'])
-
-        l_null = ~(df_temp['weight'] >= 1e-6)
-        df_feature.loc[l_null, exprs] = np.nan
+            if col == '$tradeable':
+                df_feature[col] = np.where((df_temp['Ifsuspend'] != 1) & (
+                        df_temp['StockBoard'] == 0) & (df_temp['LimitBoard'] == 0), 1.0, 0)
+            if col == '$isconstituent':
+                df_feature[col] = np.where(df_temp['weight'] >= 1e-6, 1.0, 0)
         df_feature.set_index(['tradeDate', 'code'], inplace=True)
         return df_feature
 
@@ -84,10 +86,13 @@ class StockData:
         features = ['$' + f.name.lower() for f in self._features]
         df = self._load_exprs(features)
         df = df.stack().unstack(level=1)
-        dates = df.index.levels[0]                                      # type: ignore
+        dates = df.index.levels[0]  # type: ignore
         stock_ids = df.columns
         values = df.values
         values = values.reshape((-1, len(features), values.shape[-1]))  # type: ignore
+        for i, col in enumerate(features):
+            if col in ['$tradeable', '$isconstituent']:
+                values[:, i, :][np.isnan(values[:, i, :])] = 0.0
         return torch.tensor(values, dtype=torch.float, device=self.device), dates, stock_ids
 
     @property
@@ -103,9 +108,9 @@ class StockData:
         return self.data.shape[0] - self.max_backtrack_days - self.max_future_days
 
     def make_dataframe(
-        self,
-        data: Union[torch.Tensor, List[torch.Tensor]],
-        columns: Optional[List[str]] = None
+            self,
+            data: Union[torch.Tensor, List[torch.Tensor]],
+            columns: Optional[List[str]] = None
     ) -> pd.DataFrame:
         """
             Parameters:
@@ -136,7 +141,6 @@ class StockData:
         index = pd.MultiIndex.from_product([date_index, self._stock_ids])
         data = data.reshape(-1, n_columns)
         return pd.DataFrame(data.detach().cpu().numpy(), index=index, columns=columns)
-
 
 # class StockData:
 #     _qlib_initialized: bool = False
