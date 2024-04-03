@@ -354,8 +354,8 @@ class ISCONST_AND_TRADEABLE(RollingOperator):
         start = period.start - self._delta_time
         stop = period.stop - self._delta_time
         trade_able = data.data[start:stop, int(FeatureType.TRADEABLE), :]
-        # return ~(is_constituent.bool() & trade_able.bool())
-        return ~is_constituent.bool()
+        return ~(is_constituent.bool() & trade_able.bool())
+        # return ~is_constituent.bool()
 
     def _apply(self, operand: Tensor) -> Tensor:
         # This is just for fulfilling the RollingOperator interface

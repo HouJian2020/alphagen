@@ -28,15 +28,15 @@ class AlphaEnvCore(gym.Env):
         self._device = device
 
         self.eval_cnt = 0
-        self.alpha_set = {}
+        self.alpha_set: dict[str, list[int | float]] = {} # 因子名称：【因子ic, 已测试次数】
 
         self.render_mode = None
 
     def reset(
-        self, *,
-        seed: Optional[int] = None,
-        return_info: bool = False,
-        options: Optional[dict] = None
+            self, *,
+            seed: Optional[int] = None,
+            return_info: bool = False,
+            options: Optional[dict] = None
     ) -> Tuple[List[Token], dict]:
         reseed_everything(seed)
         self._tokens = [BEG_TOKEN]
@@ -65,17 +65,25 @@ class AlphaEnvCore(gym.Env):
 
     def _evaluate(self):
         expr: Expression = self._builder.get_tree()
-        # if str(expr) in self.alpha_set:
-        #     return self.alpha_set[str(expr)]
         if self._print_expr:
-            print(expr, len(self.alpha_set))
+            print(expr, self.alpha_set.get(str(expr)))
+
+        repeat = str(expr) in self.alpha_set
+        punishment = -0.1 if repeat else 0  # 重复因子的惩罚
+        if repeat and abs(self.alpha_set[str(expr)][0]) <= 0.005:
+            return punishment  # 单因子效果很差, 返回惩罚，不要继续测试了
+
         try:
-            ret = self.pool.try_new_expr(expr)
-            self.alpha_set[str(expr)] = ret
+            ret, ic = self.pool.try_new_expr(expr)
+            if not repeat:
+                self.alpha_set[str(expr)] = [ic, 1]
+            else:
+                self.alpha_set[str(expr)][1] += 1
+                self.alpha_set[str(expr)][0] = ic
             self.eval_cnt += 1
-            return ret
+            return ret if ret > 0 else punishment  # 如果因子效果好则返回因子，否则返回惩罚
         except OutOfDataRangeError:
-            return 0.
+            return punishment
 
     def _valid_action_types(self) -> dict:
         valid_op_unary = self._builder.validate_op(UnaryOperator)
