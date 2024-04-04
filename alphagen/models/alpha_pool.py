@@ -29,7 +29,7 @@ class AlphaPoolBase(metaclass=ABCMeta):
     def to_dict(self) -> dict: ...
 
     @abstractmethod
-    def try_new_expr(self, expr: Expression) -> Tuple[float, float]: ...
+    def try_new_expr(self, expr: Expression) -> Tuple[float, float, bool]: ...
 
     @abstractmethod
     def test_ensemble(self, calculator: AlphaCalculator) -> Tuple[float, float]: ...
@@ -74,10 +74,10 @@ class AlphaPool(AlphaPoolBase):
             "weights": list(self.weights[:self.size])
         }
 
-    def try_new_expr(self, expr: Expression) -> Tuple[float, float]:
+    def try_new_expr(self, expr: Expression) -> Tuple[float, float, bool]:
         ic_ret, ic_mut, factor = self._calc_ics(expr, ic_mut_threshold=0.99)
         if ic_ret is None or ic_mut is None or np.isnan(ic_ret) or np.isnan(ic_mut).any():
-            return 0., ic_ret
+            return 0., ic_ret,  False
 
         self._add_factor(expr, factor, ic_ret, ic_mut)
         if self.size > 1:
@@ -92,7 +92,7 @@ class AlphaPool(AlphaPoolBase):
         if increment > 0:
             self.best_ic_ret = new_ic_ret
         self.eval_cnt += 1
-        return new_ic_ret, ic_ret
+        return new_ic_ret, ic_ret,  increment > 1e-7
 
     def force_load_exprs(self, exprs: List[Expression]) -> None:
         for expr in exprs:
@@ -148,7 +148,7 @@ class AlphaPool(AlphaPoolBase):
             return self.weights[:self.size]
 
     def test_ensemble(self, calculator: AlphaCalculator) -> Tuple[float, float]:
-        ic, rank_ic = calculator.calc_pool_all_ret(self.alphas[:self.size], self.weights[:self.size])
+        ic, rank_ic = calculator.calc_pool_all_ret(self.exprs[:self.size], self.weights[:self.size])
         return ic, rank_ic
 
     def evaluate_ensemble(self) -> float:

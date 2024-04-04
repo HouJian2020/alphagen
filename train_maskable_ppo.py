@@ -68,6 +68,8 @@ class CustomCallback(BaseCallback):
             print(f'Saving model checkpoint to {path}')
         with open(f'{path}_pool.json', 'w') as f:
             json.dump(self.pool.to_dict(), f)
+        with open(f'{path}_alpha_set.json', 'w') as f:
+            json.dump(self.env_core.alpha_set, f)
 
     def show_pool_state(self):
         state = self.pool.state
@@ -94,7 +96,7 @@ def main(
     seed: int = 0,
     instruments: str = "csi500",
     pool_capacity: int = 22,
-    steps: int = 300_000
+    steps: int = 200_000
 ):
     reseed_everything(seed)
 
